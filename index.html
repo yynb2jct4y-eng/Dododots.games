@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dododots Challenge</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #fdf1b3;
+            font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+            color: #4a0e2e;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #game-canvas { position: relative; width: 100%; height: 100%; }
+
+        .header {
+            position: absolute;
+            top: 20px; width: 100%;
+            display: flex; justify-content: space-around;
+            z-index: 10;
+        }
+
+        .score-box {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 0px #e6d8a0;
+            font-size: 20px;
+        }
+
+        .mascot {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            background-image: url('mascot.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: pointer;
+            animation: floatIn 2.5s ease-out forwards;
+            z-index: 5;
+        }
+
+        .bomb {
+            position: absolute;
+            width: 100px; height: 100px;
+            background-color: #222;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 50px; cursor: pointer;
+            animation: floatIn 2.5s ease-out forwards;
+            z-index: 5;
+        }
+
+        @keyframes floatIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            15% { opacity: 1; transform: scale(1.1); }
+            85% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+
+        #overlay {
+            position: fixed;
+            background: #fdf1b3;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 100; text-align: center;
+        }
+
+        #leaderboard {
+            margin-top: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            width: 280px;
+        }
+
+        /* High-visibility button */
+        .big-btn {
+            background: #4a0e2e !important;
+            color: white !important;
+            padding: 20px 60px !important;
+            font-size: 30px !important;
+            border-radius: 50px !important;
+            border: none !important;
+            cursor: pointer !important;
+            display: inline-block !important;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="score-box">Points: <span id="score">0</span></div>
+        <div class="score-box">Timer: <span id="timer">30</span>s</div>
+    </div>
+
+    <div id="game-canvas"></div>
+
+    <div id="overlay">
+        <h1 id="status-title">DODODOTS CHALLENGE</h1>
+        <p id="result-text">Catch the mascot! Avoid the 💣!</p>
+
+        <div id="save-area" style="display:none; margin-bottom: 20px;">
+            <input type="text" id="player-name" placeholder="Enter Name" style="padding:10px; font-size:18px;">
+            <button class="big-btn" onclick="saveScore()">Save Score</button>
+        </div>
+
+        <button id="start-btn" class="big-btn">START GAME</button>
+
+        <div id="leaderboard">
+            <strong>🏆 Rankings</strong>
+            <div id="leaderboard-list">No scores yet</div>
+        </div>
+    </div>
+
+<script>
+    let score = 0;
+    let timeLeft = 30;
+    let gameActive = false;
+    let leaderboard = JSON.parse(localStorage.getItem("dododotsRank")) || [];
+
+    const canvas = document.getElementById("game-canvas");
+    const scoreDisplay = document.getElementById("score");
+    const timerDisplay = document.getElementById("timer");
+    const overlay = document.getElementById("overlay");
+    const startBtn = document.getElementById("start-btn");
+
+    // Safari-friendly event listener
+    startBtn.addEventListener('click', function() {
+        startGame();
+    });
+
+    function updateRankings() {
+        const list = document.getElementById("leaderboard-list");
+        if (leaderboard.length === 0) return;
+        list.innerHTML = leaderboard
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5)
+            .map((e, i) => `<div>${i+1}. ${e.name}: ${e.score}</div>`)
+            .join('');
+    }
+    updateRankings();
+
+    function startGame() {
+        score = 0;
+        timeLeft = 30;
+        gameActive = true;
+        scoreDisplay.innerText = score;
+        timerDisplay.innerText = timeLeft;
+        overlay.style.display = "none";
+        document.getElementById("save-area").style.display = "none";
+        canvas.innerHTML = '';
+
+        const timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.innerText = timeLeft;
+            if (timeLeft <= 0) endGame("Time's Up!");
+        }, 1000);
+
+        spawn();
+        window.timerRef = timerInterval;
+    }
+
+    function spawn() {
+        if (!gameActive) return;
+
+        // Spawn 1-2 mascots
+        const numMascots = Math.floor(Math.random() * 2) + 1; // Random number between 1 and 2
+        for (let i = 0; i < numMascots; i++) {
+            const mascot = document.createElement("div");
+            mascot.className = "mascot";
+            mascot.style.left = (Math.random() * (window.innerWidth - 150)) + 'px';
+            mascot.style.top = (120 + Math.random() * (window.innerHeight - 250)) + 'px';
+            mascot.onclick = function() {
+                if (!gameActive) return;
+                score++;
+                scoreDisplay.innerText = score;
+                mascot.remove();
+            };
+            canvas.appendChild(mascot);
+            setTimeout(() => mascot.remove(), 2500);
+        }
+
+        // Spawn bomb with 30% chance
+        if (Math.random() > 0.7) {
+            const bomb = document.createElement("div");
+            bomb.className = "bomb";
+            bomb.innerHTML = "💣";
+            bomb.style.left = (Math.random() * (window.innerWidth - 150)) + 'px';
+            bomb.style.top = (120 + Math.random() * (window.innerHeight - 250)) + 'px';
+            bomb.onclick = function() {
+                if (!gameActive) return;
+                endGame("GAME OVER!");
+            };
+            canvas.appendChild(bomb);
+            setTimeout(() => bomb.remove(), 2500);
+        }
+
+        setTimeout(spawn, 500); // Maintained at 0.5 seconds for fast appearance
+    }
+
+    function endGame(msg) {
+        gameActive = false;
+        clearInterval(window.timerRef);
+        overlay.style.display = "flex";
+        document.getElementById("status-title").innerText = msg;
+        document.getElementById("result-text").innerText = "Score: " + score;
+        document.getElementById("save-area").style.display = "block";
+        startBtn.style.display = "none";
+        canvas.innerHTML = "";
+    }
+
+    function saveScore() {
+        const name = document.getElementById("player-name").value || "Player";
+        leaderboard.push({ name, score });
+        localStorage.setItem("dododotsRank", JSON.stringify(leaderboard));
+        updateRankings();
+        document.getElementById("save-area").style.display = "none";
+        startBtn.style.display = "inline-block";
+        document.getElementById("player-name").value = "";
+    }
+</script>
+</body>
+</html>
